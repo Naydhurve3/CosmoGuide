@@ -216,12 +216,6 @@ export default function App() {
         try {
           setUserProfile(JSON.parse(saved));
         } catch (err) {}
-      } else {
-        setUserProfile({
-          email: "commander@cosmoguide.io",
-          name: "Stargazer Cadet",
-          avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
-        });
       }
     };
     handleSyncProfile();
@@ -437,6 +431,9 @@ export default function App() {
               </h1>
               <p className="text-[10px] sm:text-xs text-slate-400 tracking-wide font-mono mt-0.5">
                 Interactive Portal & Window Desk System • Active Status
+              </p>
+              <p className="text-[9px] text-indigo-500/60 font-mono mt-0.5 tracking-wider">
+                Created by <span className="text-indigo-400 font-semibold">Nayan Dhurve</span>
               </p>
             </div>
           </div>

@@ -110,19 +110,6 @@ export default function VaultPanel() {
       } catch (err) {
         console.warn("Error parsing profile");
       }
-    } else {
-      // Default initial profile
-      const fallbackProfile: UserProfile = {
-        name: "Stargazer Done",
-        email: "wprojectdone@gmail.com",
-        address: "Earth Base Gamma Sector 12, Geneva Space Base",
-        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
-      };
-      setUserProfile(fallbackProfile);
-      setTypedName(fallbackProfile.name);
-      setTypedEmail(fallbackProfile.email);
-      setTypedAddress(fallbackProfile.address);
-      setTypedAvatar(fallbackProfile.avatar);
     }
 
     const savedKeys = localStorage.getItem("cosmo_key_vault");
