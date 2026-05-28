@@ -630,7 +630,43 @@ app.post("/api/test-models", async (req, res) => {
   });
 });
 
-// AI Advanced Chat Engine supporting Custom Vault Credentials passed from headers / state
+// Helper to get server env key for a provider
+function processEnvKey(provider: string): string {
+  const map: Record<string, string | undefined> = {
+    google: process.env.GEMINI_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+    nvidia: process.env.NVIDIA_API_KEY,
+    together: process.env.TOGETHER_API_KEY,
+    deepseek: process.env.DEEPSEEK_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
+    cohere: process.env.COHERE_API_KEY,
+    perplexity: process.env.PERPLEXITY_API_KEY,
+    huggingface: process.env.HUGGINGFACE_API_KEY,
+  };
+  return map[provider] || "";
+}
+
+// ── In-memory demo rate limiter (per-IP, resets on restart) ──
+const demoRequestCounts = new Map<string, { count: number; date: string }>();
+const DEMO_DAILY_LIMIT = 50;
+
+function checkDemoLimit(ip: string): { allowed: boolean; remaining: number } {
+  const today = new Date().toISOString().split("T")[0];
+  const record = demoRequestCounts.get(ip);
+  if (!record || record.date !== today) {
+    demoRequestCounts.set(ip, { count: 1, date: today });
+    return { allowed: true, remaining: DEMO_DAILY_LIMIT - 1 };
+  }
+  if (record.count < DEMO_DAILY_LIMIT) {
+    record.count++;
+    return { allowed: true, remaining: DEMO_DAILY_LIMIT - record.count };
+  }
+  return { allowed: false, remaining: 0 };
+}
+
+// AI Advanced Chat Engine — hybrid model: user key > rate-limited demo fallback
 app.post("/api/chat-advanced", async (req, res) => {
   try {
     const { message, style = "Balanced", customProviders, activeProvider = "google" } = req.body;
@@ -642,23 +678,29 @@ app.post("/api/chat-advanced", async (req, res) => {
     const providerSettings = customProviders?.[currentProvider] || {};
     let apiKey = providerSettings.key || "";
     let model = providerSettings.model || "";
+    let isDemoMode = false;
 
-    // Fallback server keys for convenience/testing if not specified in vault but defined in environment:
+    // Hybrid fallback: user's own key > rate-limited server key
     if (!apiKey) {
-      if (currentProvider === "google") {
-        apiKey = process.env.GEMINI_API_KEY || "";
-      } else if (currentProvider === "groq") {
-        apiKey = process.env.GROQ_API_KEY || "";
-      } else if (currentProvider === "openrouter") {
-        apiKey = process.env.OPENROUTER_API_KEY || "";
-      } else if (currentProvider === "anthropic") {
-        apiKey = process.env.ANTHROPIC_API_KEY || "";
+      const ip = req.ip || req.socket.remoteAddress || "unknown";
+      const demoCheck = checkDemoLimit(ip);
+      const envKey = processEnvKey(currentProvider);
+      if (!demoCheck.allowed || !envKey) {
+        return res.status(400).json({
+          error: demoCheck.allowed
+            ? `Provider '${currentProvider}' has no valid API key in your key vault and no server fallback is configured. Please visit Settings → Vault to add your own FREE key.`
+            : `Daily demo limit reached (${DEMO_DAILY_LIMIT} requests). Add your own FREE API key in Settings → Vault to continue chatting!`,
+          mode: "demo_rate_limited"
+        });
       }
+      apiKey = envKey;
+      isDemoMode = true;
+      res.setHeader("X-CosmoGuide-Mode", "demo");
     }
 
     if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
       return res.status(400).json({
-        error: `Provider '${currentProvider}' has no valid API key in your key vault. Please visit the Observatory Station Key Hub to fill it.`
+        error: `Provider '${currentProvider}' has no valid API key. Please visit the Observatory Station Key Hub to configure one.`
       });
     }
 
@@ -694,6 +736,7 @@ Answer in beautiful structured Markdown format and specify your grounding citati
       return res.json({
         content: result.text || "Signal interrupted. Cosmic radiation detected.",
         timestamp: new Date().toLocaleTimeString(),
+        mode: isDemoMode ? "demo" : "user",
         sources: ["James Webb near-infrared imaging", "NASA Astrobiology core", "Stellarium stellar databases"]
       });
     }
@@ -719,6 +762,7 @@ Answer in beautiful structured Markdown format and specify your grounding citati
       return res.json({
         content: data.content?.[0]?.text || "Communication loop disrupted.",
         timestamp: new Date().toLocaleTimeString(),
+        mode: isDemoMode ? "demo" : "user",
         sources: ["ESA Stellar Cartography", "Chandra X-Ray Observatories", "Anthropic Semantic Grid"]
       });
     }
@@ -742,6 +786,7 @@ Answer in beautiful structured Markdown format and specify your grounding citati
       return res.json({
         content: data.text || "Direct telemetry line offline.",
         timestamp: new Date().toLocaleTimeString(),
+        mode: isDemoMode ? "demo" : "user",
         sources: ["Canada-France-Hawaii Telescope spectra", "Cohere command modules", "Galactic Archive Core"]
       });
     }
@@ -767,6 +812,7 @@ Answer in beautiful structured Markdown format and specify your grounding citati
       return res.json({
         content: responseMsg || "Distributed compute clusters failed to compute.",
         timestamp: new Date().toLocaleTimeString(),
+        mode: isDemoMode ? "demo" : "user",
         sources: ["Hugging Face Open Weights repository", "Community model arrays", "Kitt Peak National Observatory"]
       });
     }
@@ -830,6 +876,7 @@ Answer in beautiful structured Markdown format and specify your grounding citati
       return res.json({
         content: data.choices?.[0]?.message?.content || "No message payload returned from model gateway.",
         timestamp: new Date().toLocaleTimeString(),
+        mode: isDemoMode ? "demo" : "user",
         sources: targetConfig.sources
       });
     }

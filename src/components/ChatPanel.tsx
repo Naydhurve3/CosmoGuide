@@ -18,6 +18,7 @@ export default function ChatPanel() {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeProvider, setActiveProvider] = useState("google");
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const chatScrollEndRef = useRef<HTMLDivElement | null>(null);
 
   // Sync active communication provider from storage hub dynamically
@@ -88,6 +89,7 @@ export default function ChatPanel() {
       const data = await response.json();
 
       setIsTyping(false);
+      setIsDemoMode(data.mode === "demo");
       setMessages((p) => [
         ...p,
         {
@@ -186,6 +188,11 @@ export default function ChatPanel() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>{activeProvider}</span>
           </span>
+          {isDemoMode && (
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1 font-extrabold tracking-wider">
+              <span>DEMO</span>
+            </span>
+          )}
         </div>
 
         {/* Dynamic style selector */}
@@ -214,6 +221,22 @@ export default function ChatPanel() {
       </div>
 
       <div className="flex-grow overflow-y-auto p-4 space-y-4 text-left">
+        {/* Demo mode banner */}
+        {isDemoMode && (
+          <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start space-x-2.5 text-xs text-amber-300/90 leading-relaxed">
+            <span className="flex-shrink-0 mt-0.5">🎭</span>
+            <div>
+              <strong>Demo Mode</strong> — Using a shared server key (50 requests/day/IP).
+              <button
+                onClick={() => { const btn = document.querySelector('[data-vault-trigger]') as HTMLElement; if (btn) btn.click(); }}
+                className="underline hover:text-amber-200 ml-1 font-semibold"
+              >
+                Add your own FREE API key → Settings
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Style selection info alert box */}
         <div className="p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl flex items-start space-x-2.5 text-xs text-indigo-300/90 leading-relaxed">
           <Info className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />

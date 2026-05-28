@@ -742,7 +742,32 @@ export default function VaultPanel() {
               </div>
             </div>
 
-            {/* Batch scan trigger block */}
+              {/* Free API key quick-links */}
+              <div className="border-t border-indigo-500/10 pt-3 pb-1">
+                <h6 className="text-[10px] uppercase font-bold text-emerald-400 font-mono leading-tight mb-2">Get a Free API Key</h6>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { name: "Google Gemini", url: "https://aistudio.google.com/app/apikey", color: "blue" },
+                    { name: "Groq (Fast)", url: "https://console.groq.com/keys", color: "orange" },
+                    { name: "OpenRouter", url: "https://openrouter.ai/keys", color: "purple" },
+                    { name: "DeepSeek", url: "https://platform.deepseek.com/api_keys", color: "emerald" },
+                    { name: "Mistral AI", url: "https://console.mistral.ai/api-keys", color: "indigo" },
+                  ].map((p) => (
+                    <a
+                      key={p.name}
+                      href={p.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`text-[9px] font-bold py-1.5 px-3 rounded-lg border transition cursor-pointer inline-flex items-center gap-1.5
+                        bg-${p.color}-600/10 border-${p.color}-500/30 text-${p.color}-300 hover:bg-${p.color}-600/20`}
+                    >
+                      🔑 {p.name}
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Batch scan trigger block */}
             <div className="border-t border-indigo-500/10 pt-3 pb-1 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="space-y-0.5">
                 <h6 className="text-[10px] uppercase font-bold text-[#93c5fd] font-mono leading-tight">Advanced Diagnostics Hub</h6>

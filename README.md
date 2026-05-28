@@ -1,22 +1,22 @@
-# 🌌 CosmoGuide
+# CosmoGuide
 
 **AI-Powered Space Knowledge Companion** — A Multi-Provider, Interactive Space Exploration Cockpit
 
-> **Created by: Nayan Dhurve** | Version: 2.0.0 (React/TypeScript Rewrite) | License: MIT
+Created by: **Nayan Dhurve** | Version: 2.0.0 | License: MIT
 
 CosmoGuide is an interactive space exploration web application powered by **11 different AI providers**. It combines real-time 3D Kepler orbital simulations, live space weather tracking, interactive star charts, deep-space AI chat, astronomy quizzes, and generative space art into a single, immersive cockpit-style interface.
 
-Unlike the original Python/Streamlit version, this rewrite is a fully client-rendered React + TypeScript SPA with an Express.js backend acting as an intelligent proxy/router between the UI and multiple AI providers.
-
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
+- [Hybrid API Key Model](#hybrid-api-key-model)
 - [Key Features](#key-features)
 - [Multi-Provider AI System](#multi-provider-ai-system)
 - [System Architecture](#system-architecture)
 - [Tech Stack](#tech-stack)
+- [Deployment Guide](#deployment-guide)
 - [Getting Started](#getting-started)
 - [Configuring API Keys](#configuring-api-keys)
 - [Supported Providers](#supported-providers)
@@ -24,131 +24,156 @@ Unlike the original Python/Streamlit version, this rewrite is a fully client-ren
 - [Data Flow & Working Principle](#data-flow--working-principle)
 - [Security & Privacy](#security--privacy)
 - [Development](#development)
-- [License](#license)
 
 ---
 
 ## Architecture Overview
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                           CosmoGuide Architecture                          │
-├────────────────────────────────────────────────────────────────────────────┤
-│                                                                            │
-│  ┌──────────────┐     ┌──────────────────┐     ┌──────────────────────┐   │
-│  │   Browser     │     │  Express Server  │     │   AI Provider APIs   │   │
-│  │  (React SPA)  │◄───►│   (Proxy Layer)  │◄───►│  (Gemini, Groq,      │   │
-│  │               │     │                  │     │   Anthropic, etc.)   │   │
-│  │  • Chat UI    │     │  • /api/chat     │     └──────────────────────┘   │
-│  │  • 3D Sim     │     │  • /api/test-key │                                │
-│  │  • Star Chart │     │  • /api/weather  │     ┌──────────────────────┐   │
-│  │  • Quiz       │     │  • /api/launches │     │   Static Data        │   │
-│  │  • Vault      │     │  • /api/news     │     │  (Mock/Synthetic)    │   │
-│  │  • ...        │     │  • ...           │     └──────────────────────┘   │
-│  └──────────────┘     └──────────────────┘                                │
-│                                                                            │
-│  ┌────────────────────────────────────────────────────────────────────┐   │
-│  │                    Browser Storage (localStorage)                   │   │
-│  │  • cosmo_key_vault     → Encrypted (masked) API keys & models      │   │
-│  │  • cosmo_active_provider → Currently selected AI provider          │   │
-│  │  • cosmo_user_profile   → User identity & preferences              │   │
-│  └────────────────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                          CosmoGuide Architecture                             │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────────┐     ┌──────────────────┐     ┌──────────────────────┐     │
+│  │   Browser     │     │  Express Server  │     │   AI Provider APIs   │     │
+│  │  (React SPA)  │◄───►│   (Proxy Layer)  │◄───►│  (Gemini, Groq,      │     │
+│  │               │     │   + Rate Limiter │     │   Anthropic, etc.)   │     │
+│  │  • Chat UI    │     │                  │     └──────────────────────┘     │
+│  │  • 3D Sim     │     │  • /api/chat     │                                  │
+│  │  • Star Chart │     │  • /api/test-key │     ┌──────────────────────┐     │
+│  │  • Quiz       │     │  • /api/weather  │     │   Static Data        │     │
+│  │  • Vault      │     │  • /api/launches │     │  (Mock/Synthetic)    │     │
+│  │  • ...        │     │  • /api/news     │     └──────────────────────┘     │
+│  └──────────────┘     └──────────────────┘                                   │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │                    Browser Storage (localStorage)                     │   │
+│  │  • cosmo_key_vault       → API keys & models                         │   │
+│  │  • cosmo_active_provider → Currently selected AI provider            │   │
+│  │  • cosmo_user_profile    → User identity & preferences                │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The application follows a **thin-server architecture**:
+The application follows a **thin-server architecture** with a hybrid API key model:
 
-- **Frontend (React SPA):** All UI rendering, state management, 3D simulations, and user interaction happen in the browser. The app uses a modular window system — each feature (chat, orbits, weather, etc.) is an independent panel that can be opened, minimized, maximized, or closed.
-- **Backend (Express.js):** Acts as a lightweight API proxy. It receives requests from the frontend, forwards them to the appropriate AI provider using the user's API key, and returns the response. It also serves static mock data for demos (launches, weather, news, comparisons) and the built Vite frontend in production.
-- **Local Storage:** API keys and user preferences are stored in the browser's `localStorage` — they never touch the server's file system or database.
+- **Frontend (React SPA):** All UI rendering, 3D simulations, and state management happen in the browser.
+- **Backend (Express.js):** Acts as a lightweight API proxy with built-in rate limiting for demo users.
+- **Local Storage:** API keys and preferences are stored in the browser only.
+
+---
+
+## Hybrid API Key Model
+
+CosmoGuide uses a **three-tier hybrid model** that balances user experience with security:
+
+```
+User sends a chat message
+         │
+         ▼
+┌─────────────────────────────────────┐
+│  Does user have their OWN API key   │
+│  saved in the Vault (localStorage)? │
+└─────────────────────────────────────┘
+         │
+    ┌────┴────┐
+    │ YES    NO
+    ▼        ▼
+┌────────┐  ┌─────────────────────────────────┐
+│ Use    │  │ Is server env var available      │
+│ their  │  │ (process.env.GEMINI_API_KEY)?    │
+│ key    │  └─────────────────────────────────┘
+│ No     │           │
+│ limits │     ┌─────┴─────┐
+└────────┘     │ YES       NO
+               ▼           ▼
+        ┌─────────────────┐  ┌──────────────────────────────┐
+        │ Use server key  │  │ Return error: configure your │
+        │ with rate limit │  │ own key in Vault             │
+        │ 50 req/IP/day   │  └──────────────────────────────┘
+        │ Show DEMO badge │
+        └─────────────────┘
+```
+
+### Tier Breakdown
+
+| Tier | Who Pays | Rate Limit | UI Indicator | Use Case |
+|------|----------|------------|-------------|----------|
+| **User Key** | The visitor (their own API key) | None | Provider name badge | Power users, regulars |
+| **Demo Key** | You (server env var) | 50 requests/IP/day | "DEMO" badge + banner | New users trying the app |
+| **No Key** | N/A | N/A | Error message | User must configure a key |
+
+### Why This Approach?
+
+- **New users can instantly try the app** without any setup friction (50 free chats)
+- **Your API key is never exposed** to the browser — it stays server-side
+- **Rate limiting prevents surprise bills** — even with 1,000 daily users, you stay within Gemini's free tier
+- **Power users add their own key** — they bypass limits and you pay nothing
 
 ---
 
 ## Key Features
 
-### 🤖 Multi-Provider AI Chat
+### Multi-Provider AI Chat
 - **11 AI providers** — Google Gemini, Groq, Anthropic Claude, OpenRouter, NVIDIA NIM, Together AI, DeepSeek, Mistral AI, Cohere, Perplexity, Hugging Face
 - **Three response styles** — Simple (layperson), Balanced (structured), Expert (technical/deep)
-- **Real-time streaming** — Typing indicators, source citations, text-to-speech
-- **Conversation memory** — Full chat history within the session
+- Real-time typing indicators, source citations, text-to-speech
+- Full chat history within the session
 
-### 🌍 3D Planetary Orbital Simulator
+### 3D Planetary Orbital Simulator
 - Real-time Kepler orbital mechanics with configurable planetary parameters
-- Gravity simulation, orbital speed visualization, and camera controls
+- Gravity simulation, orbital speed visualization, camera controls
 - Built with Canvas/Web API for smooth 60fps rendering
 
-### 📡 Heliophysics Space Weather Tracker
-- Real-time solar flare monitoring (Kp index, solar wind speed/density, X-ray flux)
+### Heliophysics Space Weather Tracker
+- Solar flare monitoring (Kp index, solar wind speed/density, X-ray flux)
 - Aurora visibility probability forecasts
 - Geomagnetic storm alerts
 
-### ⭐ Tactical Star Map
+### Tactical Star Map
 - Celestial coordinate system (declination/right ascension)
 - Interactive star chart with constellation overlays
 
-### 🧠 Astronomy Quiz Engine
+### Astronomy Quiz Engine
 - Multiple-choice trivia with explanations and scoring
-- Dynamic question pool covering astrophysics, planetary science, and cosmology
+- Dynamic question pool covering astrophysics, planetary science, cosmology
 
-### 🎨 Astro Vision — Generative Space Art
+### Astro Vision — Generative Space Art
 - AI-powered celestial image synthesis
 - High-resolution nebula, galaxy, and supernova wallpapers
 
-### 🚀 Mission Control
+### Mission Control
 - Live launch countdowns (SpaceX, NASA Artemis, ISRO Gaganyaan)
 - Satellite tracking and mission status dashboard
 
-### 🎂 Hubble Birthday Time Machine
-- Discover what the Hubble/James Webb telescopes captured on your birthday
+### Hubble Birthday Time Machine
+- Discover what Hubble/James Webb captured on your birthday
 - Seasonal archive with high-resolution imagery
 
-### 🔬 Celestial Scale Matrix (Compare Mode)
+### Celestial Scale Matrix (Compare Mode)
 - Side-by-side comparison of planets, stars, and galaxies
 - Physical properties: mass, diameter, temperature, gravity, atmosphere
 
-### 🛡️ Conspiracy Debunker
-- Science-based rebuttals of common space myths and hoaxes
-- Peer-reviewed reasoning against flat Earth, moon landing denial, etc.
-
-### 🌌 Personal Cosmos — Night Sky Guide
-- Personalized rise/set times based on user coordinates
-- Planetary visibility windows and stargazing recommendations
-
-### 🏆 Gamification Center
-- Cosmic Bingo challenges (5×5 daily activity grid)
-- Speed Gauntlet — timed rapid-fire trivia
-- Loyalty stamp calendar and badge progress tracking
-
-### 🎮 Deep Space Toys
-- 2D Verlet gravity simulator — launch custom satellites and watch orbital mechanics in action
-- Scale of the Universe — scroll from atomic scales to the observable cosmos
-
-### 🔊 Space Soundscape Generator
-- Procedural audio synthesis of stellar phenomena
-- Micro-frequency hums tuned to gravity, density, and magnetic field data
-
-### 🧬 Cosmic Twin Matcher
-- Biometric-style personality matching to celestial objects
-- Matches user responses with asteroids, planets, or pulsars
-
-### 🔐 Settings Portal (Vault)
-- **Multi-provider API key management** (11 providers)
+### Settings Portal (Vault)
+- Multi-provider API key management (11 providers)
 - Key testing/verification with real API calls
-- Model scanning — batch-tests available models and identifies free vs paid options
+- Model scanning — batch-tests available models, identifies free vs paid options
+- One-click "Get Free Key" links to provider signup pages
 - User profile management with avatar upload
 
-### 🌐 Social Features
-- One-click sharing to Twitter/X, Reddit, WhatsApp
-- Newsletter subscription for launch alerts
-- Exit-intent popup with free cosmic calendar download
-- Floating cursor comet trail particles
-- Ambient audio feedback (radar pings on interactions)
+### And More...
+- **Conspiracy Debunker** — Science-based rebuttals of space myths
+- **Personal Cosmos** — Night sky guide with personalized rise/set times
+- **Gamification Center** — Cosmic Bingo, Speed Gauntlet, badges
+- **Deep Space Toys** — 2D gravity simulator, Scale of the Universe
+- **Space Soundscape Generator** — Procedural audio synthesis
+- **Cosmic Twin Matcher** — Personality matching to celestial objects
 
 ---
 
 ## Multi-Provider AI System
 
-One of CosmoGuide's signature features is its **11-provider AI routing system**. Here's how it works:
+One of CosmoGuide's signature features is its **11-provider AI routing system**.
 
 ### Provider Selection Flow
 
@@ -166,25 +191,26 @@ User opens Chat → ChatPanel reads activeProvider from localStorage
               ┌──── Key found in request? ────┐
               │           Yes      No          │
               │             ↓        ↓         │
-              │        Use it    Fall back to  │
-              │                   process.env  │
+              │        Use it    Rate-limited  │
+              │                   server env   │
+              │                   fallback     │
               │                      ↓         │
               │       ┌─── Key valid? ────┐    │
               │       │   Yes        No    │    │
               │       │    ↓           ↓   │    │
               │       │ Call API   Return   │    │
               │       │          error to  │    │
-              │       │          user to   │    │
-              │       │          configure  │    │
-              │       │          via Vault  │    │
+              │       │          user      │    │
               └───────┴────────────────────┘    │
                          ↓
               Response → User sees AI reply
+                         ↓
+              Response includes mode field:
+                "user" — using visitor's own key
+                "demo" — using server key (rate-limited)
 ```
 
-### Cascading Logic per Provider
-
-The server handles each provider differently:
+### Provider Routing
 
 | Provider | API Type | Auth Header | Endpoint |
 |----------|----------|-------------|----------|
@@ -208,8 +234,8 @@ CosmoGuide/
 │   ├── index.css                 # Global styles, animations, custom theme
 │   ├── types.ts                  # Shared TypeScript interfaces
 │   └── components/               # All feature modules (17 panels)
-│       ├── ChatPanel.tsx         # AI chat interface with style selector
-│       ├── VaultPanel.tsx        # Settings Portal — API keys, profile, model scanning
+│       ├── ChatPanel.tsx         # AI chat interface with demo mode indicator
+│       ├── VaultPanel.tsx        # Settings Portal — API keys, profile, free key links
 │       ├── SolarSystem3D.tsx     # 3D Kepler orbital simulator
 │       ├── StarChart.tsx         # Interactive celestial star map
 │       ├── SpaceDataPanel.tsx    # Heliophysics weather & telemetry
@@ -226,7 +252,7 @@ CosmoGuide/
 │       ├── SoundscapeGenerator.tsx # Procedural space audio synthesis
 │       └── SpaceBackground.tsx   # Parallax particle starfield
 │
-├── server.ts                     # Express backend — API routes, AI proxy, static serving
+├── server.ts                     # Express backend — API proxy, rate limiter, static serving
 ├── package.json                  # Dependencies & scripts
 ├── tsconfig.json                 # TypeScript configuration
 ├── vite.config.ts                # Vite bundler configuration
@@ -255,36 +281,84 @@ CosmoGuide/
 
 ---
 
+## Deployment Guide
+
+CosmoGuide is designed for easy deployment on **Render** (free tier supported).
+
+### Deploy on Render
+
+1. Push your code to a GitHub repository
+2. Go to [render.com](https://render.com) → Sign up with GitHub
+3. Click **New +** → **Web Service**
+4. Connect your `CosmoGuide` repository
+5. Fill in the settings:
+
+| Setting | Value |
+|---------|-------|
+| **Name** | `cosmoguide` (or any) |
+| **Runtime** | Node |
+| **Build Command** | `npm install && npm run build` |
+| **Start Command** | `npm start` |
+| **Plan** | Free |
+
+6. Click **Create Web Service**
+7. After deployment (~2-3 min), your app is live at `https://cosmoguide.onrender.com`
+
+### Environment Variables (Optional)
+
+Set these in Render dashboard → Environment to enable the **demo mode** fallback:
+
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+When set, new visitors get 50 free chat requests/day using this key before being prompted to add their own.
+
+### Custom Domain
+
+Render supports custom domains with free SSL. Go to your service dashboard → **Settings** → **Custom Domain**.
+
+### Preventing Cold Starts (Free Tier)
+
+The free Render tier spins down after 15 min of inactivity. Prevent this with a free cron job:
+- Create an account at [cron-job.org](https://cron-job.org) (free)
+- Set it to ping `https://cosmoguide.onrender.com/api/health` every 14 minutes
+- This keeps your app warm at no cost
+
+### Updating After Deployment
+
+Every `git push` to your main branch automatically triggers a new build on Render:
+
+```bash
+git add .
+git commit -m "your changes"
+git push origin main
+# Render auto-deploys in ~2 min
+```
+
+---
+
 ## Getting Started
 
 ### Prerequisites
+- Node.js 18+ (includes npm)
+- A free API key from at least one AI provider
 
-- **Node.js** 18.x or later (includes `npm`)
-- A **free API key** from at least one supported AI provider (see [Supported Providers](#supported-providers))
-
-### Installation & Running
+### Installation
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/Naydhurve3/CosmoGuide.git
 cd CosmoGuide
-
-# 2. Install dependencies
 npm install
-
-# 3. Start the development server (frontend + backend together)
 npm run dev
 ```
 
-The app will be available at **http://localhost:3000**.
+Open **http://localhost:3000** in your browser.
 
 ### Production Build
 
 ```bash
-# Build frontend + bundle backend
 npm run build
-
-# Start production server
 npm start
 ```
 
@@ -292,58 +366,48 @@ npm start
 
 ## Configuring API Keys
 
-CosmoGuide requires an API key from at least one AI provider to function. **No API keys are hardcoded or shipped with the repository** — every user must supply their own.
+CosmoGuide requires an API key from at least one AI provider to function. **No API keys are hardcoded or shipped with the repository.**
 
 ### Method 1: Settings Portal (Recommended)
 
-This is the easiest way — no file editing required.
+1. Open CosmoGuide → Click **Settings Portal** (top-right header)
+2. Scroll to **Planetary API Endpoint Systems** → Click **Configure Keys**
+3. Select a provider (e.g., `Google Gemini Services`)
+4. Paste your API key → Select a model → Click **Test Connection Key**
+5. Click **Set Active** to make it the active AI backend
+6. Navigate to **Cosmic AI Core** chat and start asking questions!
 
-1. Open CosmoGuide in your browser at `http://localhost:3000`
-2. Click the **Settings Portal** button in the top-right header
-3. Scroll down to **Planetary API Endpoint Systems** → click **Configure Keys**
-4. Select a provider from the dropdown (e.g., `Google Gemini Services`)
-5. Paste your API key in the **Secret API key** field
-6. Optionally select a specific model from the **Dynamic Model List**
-7. Click **Test Connection Key** to verify your key works
-8. Click **Set Active** on your configured provider to make it the active AI backend
-9. Navigate to **Cosmic AI Core** chat and start asking questions!
+Your keys are stored securely in browser `localStorage` and persist between sessions.
 
-Your keys are stored securely in your browser's `localStorage` and persist between sessions.
+### Method 2: Environment Variables (Server Fallback — For Demo Mode)
 
-### Method 2: Environment Variables (Server Fallback)
+Optionally set fallback keys in Render dashboard or `.env` file:
 
-Optionally, you can set fallback keys in a `.env` file in the project root:
-
-```env
-GEMINI_API_KEY="your_gemini_key"
-GROQ_API_KEY="your_groq_key"
-OPENROUTER_API_KEY="your_openrouter_key"
-ANTHROPIC_API_KEY="your_anthropic_key"
+```
+GEMINI_API_KEY=your_gemini_key
+GROQ_API_KEY=your_groq_key
+OPENROUTER_API_KEY=your_openrouter_key
 ```
 
-> **Note:** Keys set via Settings Portal always take priority over `.env` keys. The `.env` fallback is useful for quick testing or when you don't want to re-enter keys after clearing browser data.
+These are used as rate-limited demo fallback when a visitor hasn't configured their own key (50 requests/IP/day).
 
 ---
 
 ## Supported Providers
 
-| # | Provider | Free Tier | API Key Sign-Up | Model Examples |
-|---|----------|-----------|-----------------|----------------|
-| 1 | **Google Gemini** | ✅ Free tier | [aistudio.google.com](https://aistudio.google.com) | Gemini 3.5 Flash, 3.1 Pro |
-| 2 | **Groq** | ✅ Free tier | [console.groq.com](https://console.groq.com) | Llama 3.3 70B, Mixtral 8x7B |
-| 3 | **OpenRouter** | ✅ Free models | [openrouter.ai](https://openrouter.ai) | Gemini 2.1 Pro Free, Llama 3 8B Free |
-| 4 | **Anthropic Claude** | ❌ Paid only | [console.anthropic.com](https://console.anthropic.com) | Claude 3.5 Sonnet, Haiku, Opus |
-| 5 | **NVIDIA NIM** | ✅ Free tier | [build.nvidia.com](https://build.nvidia.com) | Llama 3.1 405B, Nemotron 70B |
-| 6 | **Together AI** | ✅ Free credits | [api.together.xyz](https://api.together.xyz) | Llama 3.1 70B, Mixtral 8x7B |
-| 7 | **DeepSeek** | ✅ Free tier | [platform.deepseek.com](https://platform.deepseek.com) | DeepSeek Chat (V3), Coder |
-| 8 | **Mistral AI** | ✅ Free tier | [console.mistral.ai](https://console.mistral.ai) | Mistral 7B, Mistral Large, Codestral |
-| 9 | **Cohere** | ✅ Free tier | [dashboard.cohere.com](https://dashboard.cohere.com) | Command R+, Command R |
-| 10 | **Perplexity** | ❌ Paid only | [docs.perplexity.ai](https://docs.perplexity.ai) | Sonar Reasoning, Sonar Pro |
-| 11 | **Hugging Face** | ✅ Free inference | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) | Llama 3.1 8B, Phi 3 Mini, Mistral 7B |
-
-### Recommendation for New Users
-
-Start with **Google Gemini** (free, generous quota, fast) or **Groq** (free, extremely fast inference on Llama models). Both are one-click signup with no credit card required.
+| # | Provider | Free Tier | Sign-Up | Models |
+|---|----------|-----------|---------|--------|
+| 1 | Google Gemini | Free | [aistudio.google.com](https://aistudio.google.com) | Gemini 3.5 Flash, 3.1 Pro |
+| 2 | Groq | Free | [console.groq.com](https://console.groq.com) | Llama 3.3 70B, Mixtral 8x7B |
+| 3 | OpenRouter | Free models | [openrouter.ai](https://openrouter.ai) | Gemini 2.1 Pro Free, Llama 3 8B Free |
+| 4 | Anthropic Claude | Paid | [console.anthropic.com](https://console.anthropic.com) | Claude 3.5 Sonnet, Haiku, Opus |
+| 5 | NVIDIA NIM | Free | [build.nvidia.com](https://build.nvidia.com) | Llama 3.1 405B, Nemotron 70B |
+| 6 | Together AI | Free credits | [api.together.xyz](https://api.together.xyz) | Llama 3.1 70B, Mixtral 8x7B |
+| 7 | DeepSeek | Free | [platform.deepseek.com](https://platform.deepseek.com) | DeepSeek Chat (V3), Coder |
+| 8 | Mistral AI | Free | [console.mistral.ai](https://console.mistral.ai) | Mistral 7B, Mistral Large, Codestral |
+| 9 | Cohere | Free | [dashboard.cohere.com](https://dashboard.cohere.com) | Command R+, Command R |
+| 10 | Perplexity | Paid | [docs.perplexity.ai](https://docs.perplexity.ai) | Sonar Reasoning, Sonar Pro |
+| 11 | Hugging Face | Free inference | [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) | Llama 3.1 8B, Phi 3 Mini, Mistral 7B |
 
 ---
 
@@ -378,7 +442,7 @@ All 17 feature modules are accessible from the main dashboard grid or via the **
 
 ```
 npm run dev → tsx server.ts
-  ├── Express listens on port 3000
+  ├── Express listens on port 3000 (or $PORT in production)
   ├── Vite middleware serves React SPA in dev mode
   └── SPA loads in browser → App.tsx mounts
        ├── SpaceBackground (parallax particles) starts
@@ -396,13 +460,12 @@ User types question → ChatPanel
   → Reads active provider (cosmo_active_provider)
   → POST /api/chat-advanced { message, style, customProviders, activeProvider }
   → Server extracts key for provider
-     ├── If missing → returns 400 "Configure key in Vault"
-     └── If present → calls provider's API
-          ├── Google Gemini → @google/genai SDK
-          ├── Anthropic → REST to api.anthropic.com
-          ├── OpenAI-compatible (Groq, etc.) → REST to respective /v1/chat/completions
-          └── Response parsed → { content, timestamp, sources }
-  → ChatPanel appends model response to message list
+     ├── Has user key? → Use it (no limits)
+     ├── No user key? → Rate-limited server env fallback (50/IP/day)
+     │                   → Sets X-CosmoGuide-Mode: demo header
+     └── No key at all? → Returns error: configure in Vault
+  → API call to provider → Response with mode field
+  → ChatPanel appends response + shows DEMO badge if applicable
   → Auto-scroll to latest message
 ```
 
@@ -412,8 +475,8 @@ User types question → ChatPanel
 User clicks "Test Connection Key" in VaultPanel
   → POST /api/test-key { provider, apiKey, model }
   → Server sends minimal ping to provider's API
-     ├── Success → status: "active", testLogs: "Connected!"
-     └── Failure → status: "error", testLogs: error message
+  ├── Success → status: "active", testLogs: "Connected!"
+  └── Failure → status: "error", testLogs: error message
   → Status displayed in Vault UI (green/red indicator)
 ```
 
@@ -422,7 +485,7 @@ User clicks "Test Connection Key" in VaultPanel
 ```
 User clicks "Scan Available Models" in VaultPanel
   → POST /api/test-models { provider, apiKey }
-  → Server fetches model list from provider (or uses fallback static list)
+  → Server fetches model list (or uses static fallback)
   → Batch tests each model (up to 15) with timeout
   → Returns { id, name, working, isFree, error }
   → Vault displays sorted results:
@@ -442,22 +505,23 @@ Each module is a "window" managed by App.tsx:
 
 User actions:
   → Click module card → handleLaunch(tab) → sets activeTab
-  → Click "Minimize" → handleMinimize(tab) → adds to minimizedWindows, clears activeTab
+  → Click "Minimize" → handleMinimize(tab) → adds to minimizedWindows
   → Click "Maximize" → handleMaximizeToggle(tab) → fullscreen overlay
-  → Click "Close" → handleCloseWindow(tab) → removes from activeTab + minimizedWindows
-  → Click dock icon → handleRestore(tab) → removes from minimizedWindows, sets activeTab
+  → Click "Close" → handleCloseWindow(tab) → removes from activeTab
+  → Click dock icon → handleRestore(tab) → removes from minimizedWindows
 ```
 
 ---
 
 ## Security & Privacy
 
-- **No API keys are stored in the repository.** The `.gitignore` explicitly excludes all `.env*` files (except `.env.example`).
-- **API keys are stored in browser localStorage only.** They never transit through a database or file system on the server.
-- **The server acts as a pass-through proxy** — it forwards your key to the AI provider and returns the response. It does not log or persist keys.
-- **All API calls are made server-side** to avoid CORS issues and protect your key from client-side network inspection.
-- **No user data is collected or tracked.** No analytics, no cookies, no telemetry back to any third party.
-- **Chat history is ephemeral** — it exists only in the current browser session and is lost on page refresh.
+- **No API keys are stored in the repository.** `.gitignore` excludes all `.env*` files.
+- **API keys are stored in browser localStorage only.** Never on the server.
+- **Demo keys stay server-side.** The `X-CosmoGuide-Mode: demo` header tells the client it's using a shared key, but the key itself is never sent to the browser.
+- **Rate limiting prevents abuse.** Each IP gets 50 demo requests/day. Resets daily.
+- **Server acts as a pass-through proxy.** Keys are forwarded to AI providers and not logged.
+- **No user data is collected or tracked.** No analytics, cookies, or telemetry.
+- **Chat history is ephemeral.** Lost on page refresh.
 
 ---
 
@@ -486,9 +550,6 @@ User actions:
 3. Add the provider to the API key test logic in `server.ts` (`/api/test-key` endpoint)
 4. Add the provider to the chat routing logic in `server.ts` (`/api/chat-advanced` endpoint)
 5. Add static model listings in `/api/models` and `/api/test-models`
+6. Add the provider to `processEnvKey()` in `server.ts` for demo mode support
 
 ---
-
-## License
-
-MIT License — Feel free to use, modify, and distribute for learning and portfolio purposes.
