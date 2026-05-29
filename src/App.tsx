@@ -1,3 +1,7 @@
+// CosmoGuide - AI Space Exploration Cockpit
+// Created by: Nayan Dhurve (nayandhurve44@gmail.com)
+// License: MIT
+
 import React, { useState, useEffect, useRef } from "react";
 import SpaceBackground from "./components/SpaceBackground";
 import SolarSystem3D from "./components/SolarSystem3D";
@@ -1098,6 +1102,20 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Footer — Creator Watermark */}
+      <footer className="mt-auto pt-6 pb-4 text-center border-t border-indigo-500/5">
+        <p className="text-[10px] text-indigo-500/40 font-mono tracking-wider">
+          CosmoGuide — Created by <span className="text-indigo-400/60 font-semibold">Nayan Dhurve</span>
+          <span className="mx-1.5 text-indigo-500/20">|</span>
+          <a href="mailto:nayandhurve44@gmail.com" className="text-indigo-400/40 hover:text-indigo-300/60 transition">
+            nayandhurve44@gmail.com
+          </a>
+        </p>
+        <p className="text-[8px] text-indigo-500/20 font-mono mt-0.5">
+          MIT License — Built with React, TypeScript & Express
+        </p>
+        </footer>
 
       {/* INTENT-EXIT POPUP MODAL (Reduce Bounce Rate) */}
       {showExitPopup && (

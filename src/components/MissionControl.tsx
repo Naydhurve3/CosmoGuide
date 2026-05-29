@@ -1,3 +1,7 @@
+// CosmoGuide - AI Space Exploration Cockpit
+// Created by: Nayan Dhurve (nayandhurve44@gmail.com)
+// License: MIT
+
 import React, { useState, useEffect } from "react";
 import { Orbit, Compass, Radio, Bell, CheckCircle, Clock, AlertTriangle, Play, RefreshCw, Zap } from "lucide-react";
 

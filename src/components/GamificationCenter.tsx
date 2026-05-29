@@ -1,3 +1,7 @@
+// CosmoGuide - AI Space Exploration Cockpit
+// Created by: Nayan Dhurve (nayandhurve44@gmail.com)
+// License: MIT
+
 import React, { useState, useEffect, useRef } from "react";
 import { 
   Trophy, Flame, Clock, RefreshCw, Eye, Sparkles, Check, ChevronRight, Award, Shield, Compass, HelpCircle, AlertOctagon, Heart, Zap, Map
